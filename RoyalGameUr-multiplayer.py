@@ -417,7 +417,10 @@ class ThreadedClient:
     def listen(self):
         while True:
             data = self.sock.recv(4096).decode(encoding)
-            print(data)
+            data = data.strip()
+            if data:
+                print(ANSI.erase_entire_screen)
+                print(data)
 
     def main(self):
         threading.Thread(target=self.listen).start()
