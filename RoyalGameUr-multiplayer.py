@@ -64,9 +64,11 @@ class Game:
             continue
 
     def multiplayer(self):
-        user_input = Reader.parse(input("Play as 'host' or 'guest'? "))
+        user_input = Reader.parse(input("Play as 'host' or 'guest' (or 'host player' [experimental])? "))
         if user_input == "host":
             self.host()
+        if user_input == "host player":
+            self.host_player()
         if user_input == "guest":
             ip = input("What IP Address would you like to connect to? ")
             self.guest(ip)
@@ -78,6 +80,14 @@ class Game:
             # server_thread.daemon = True
             # server_thread.start()
             # self.guest("localhost")
+    def host_player(self, port=1025):
+        with ThreadedTCPServer(('', port), PlayerHandler) as server:
+            print(f'The Royal Game of Ur server is running.')
+            # server.serve_forever()
+            server_thread = threading.Thread(target=server.serve_forever)
+            server_thread.daemon = True
+            server_thread.start()
+            self.guest("localhost")
     def guest(self, ip):
         try:
             client = ThreadedClient(ip)
