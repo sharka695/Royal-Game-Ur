@@ -64,10 +64,10 @@ class Game:
             continue
 
     def multiplayer(self):
-        user_input = Reader.parse(input("Play as 'host' or 'guest' (or 'host player' [experimental])? "))
+        user_input = Reader.parse(input("Play as 'host' or 'guest' (or 'hostplayer' [experimental])? "))
         if user_input == "host":
             self.host()
-        if user_input == "host player":
+        if user_input == "hostplayer":
             self.host_player()
         if user_input == "guest":
             ip = input("What IP Address would you like to connect to? ")
