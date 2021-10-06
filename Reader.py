@@ -8,9 +8,10 @@ class Token(NamedTuple):
     value: str
     line: int
     column: int
-    
+
 def tokenize(user_input):
     keywords = {
+        'roll',
         'quit',
         'multiplayer',
         'host',
@@ -43,7 +44,7 @@ def tokenize(user_input):
         if kind == 'NUMBER':
             value = float(value) if '.' in value else int(value)
         elif kind == 'ID' and value.lower() in keywords:
-            kind = value.lower()
+            kind = 'KEYWORD' # value.lower()
         elif kind == 'NEWLINE':
             line_start = mo.end()
             line_num += 1
@@ -58,23 +59,21 @@ def parse(arg):
     arg = tokenize(arg)
     prev = None
     for token in arg:
-        if token.value == 'quit':
-            return token.value
-        elif token.value == 'multiplayer':
-            return token.value
-        elif token.value == 'host':
-            return token.value
-        elif token.value == 'guest':
-            return token.value
-        elif token.value == 'play':
-            return token.value
-        elif token.value == 'skip':
-            return token.value
-        elif token.value == 'board':
-            return token.value
-        elif token.value == 'help':
-            return token.value
-        elif token.value == 'yes':
+        # elif token.value == 'multiplayer':
+        #     return token.value
+        # elif token.value == 'host':
+        #     return token.value
+        # elif token.value == 'guest':
+        #     return token.value
+        # elif token.value == 'play':
+        #     return token.value
+        # elif token.value == 'skip':
+        #     return token.value
+        # elif token.value == 'board':
+        #     return token.value
+        # elif token.value == 'help':
+        #     return token.value
+        if token.value == 'yes':
             return True
         elif token.value == 'no':
             return False
@@ -86,10 +85,12 @@ def parse(arg):
             continue
         elif token.type == 'NUMBER':
             return (prev, token.value)
+        elif token.type == 'KEYWORD':
+            return token.value
         else:
             return token.value
     return
-    
+
 def interpret(game, arg):
     arg = self.parse(arg)
     if type(arg) is bool:
@@ -100,4 +101,3 @@ def interpret(game, arg):
         except AttributeError:
             print("I can't do that.")
         return func(arg[1])
-        

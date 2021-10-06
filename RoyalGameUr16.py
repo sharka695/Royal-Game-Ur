@@ -5,17 +5,21 @@ import threading
 import sys
 from ANSI import ANSI
 
+
+style = ANSI.background_white + ANSI.foreground_black
+
 class Game:
+    print(style)
     intro = 'Welcome to the Royal Game of Ur!\nEnter "play" to begin, or "help" to learn how to play the game.'
     prompt = "Ur: "
     instructions = "Select piece by column (i.e. 0-13), or -1 to select a piece from the starting line."
     def __init__(self, safe_a=4, rosette_a=4, safe_b=2, rosette_b=2, combat_a=8, rosette_c=4, num_pieces=7, dice=4):
         self.board = Board(safe_a, rosette_a, safe_b, rosette_b, combat_a, rosette_c, num_pieces, dice)
-        self.help = "Ur is a race between two sides. Get all your pieces from the left to the right, landing exactly on space " + str(self.board.total_spaces) + ".\nBut watch out! Spaces " + str(self.board.safe_a) + " to " + str(self.board.safe_a + self.board.combat_a - 1) + " are combat spaces.\nIf your opponent lands on your piece, and it isn't on a rosette (*), it'll have to return to the beginning.\nNot only are rosettes safe to land on, they also mean you get another roll when you land on them.\nNote: You can only skip a turn if there are absolutely no moves available. Otherwise, you must make a move, even if it's disadvantageous to you."
+        self.help = "Ur is a race between two sides. Get all your pieces from the left to the right, landing exactly on space " + str(self.board.total_spaces) + ".\rBut watch out! Spaces " + str(self.board.safe_a) + " to " + str(self.board.safe_a + self.board.combat_a - 1) + " are combat spaces.\rIf your opponent lands on your piece, and it isn't on a rosette (*), it'll have to return to the beginning.\rNot only are rosettes safe to land on, they also mean you get another roll when you land on them.\rNote: You can only skip a turn if there are absolutely no moves available. Otherwise, you must make a move, even if it's disadvantageous to you."
 
         self.active = False
     def play(self):
-        prompt = self.instructions + "\n" + self.board.player.capitalize() + ": "
+        prompt = self.instructions + "\r" + self.board.player.capitalize() + ": "
 
         print(self.intro)
         while not self.active:
@@ -29,19 +33,25 @@ class Game:
                 elif user_input == "multiplayer":
                     self.multiplayer()
                 elif user_input == "quit" or user_input == "exit":
-                    q = input("Are you sure you would like to quit? y/n: ")
+                    q = input(ANSI.foreground_red + "Are you sure you would like to quit? y/n: " + style)
                     if q == "y":
-                        exit()
+                        return
         while self.play_turn():
             continue
 
     def play_turn(self):
-        self.prompt = self.instructions + "\n" + self.board.player.capitalize() + ": "
-        self.won = self.board.player.capitalize() + " has won!\nCongratulations!!!\U0001f389"
+        if self.board.player == "white":
+            coloration = ANSI.background_white + ANSI.foreground_black
+        else:
+            coloration = ANSI.background_black + ANSI.foreground_white
+        self.prompt = self.instructions + "\r" + coloration +  self.board.player.capitalize() + ": " + style
+        self.won = ANSI.blinking + self.board.player.capitalize() + " has won!\rCongratulations!!!\U0001f389" + style
         print(self.board)
         dist = self.board.die.roll()
+        rolled = ANSI.foreground_red + "You've rolled a " + str(dist) + "!" + style
+        print(rolled)
         if not dist:
-            print("You lose a turn.")
+            print(coloration + self.board.player + style + " loses a turn.")
             self.board.switch_sides()
             return True
         success = False
@@ -54,6 +64,8 @@ class Game:
                     print(self.help)
                 if user_input == 'board':
                     print(self.board)
+                if user_input == 'roll':
+                    print(rolled)
                 if user_input == 'skip':
                     if self.board.should_skip():
                         self.board.switch_sides()
@@ -68,6 +80,7 @@ class Game:
             return False
         if not reroll:
             self.board.switch_sides()
+        print(ANSI.erase_entire_screen)
         return True
     def get_input(self):
         line = Reader.parse(input(self.prompt))
@@ -216,7 +229,7 @@ class Board:
         return True
 
     def __repr__(self):
-        s = ''
+        s = ANSI.background_white + ANSI.foreground_black#''
         for color, spaces in self.contents.items():
             s += color.capitalize().center(6) + ":"
             for space in spaces:
@@ -228,7 +241,7 @@ class Board:
         s += "".center(7)
         for n in range(self.total_spaces):
             s += str(n).center(4)
-        return s
+        return s + style
 class FinishLine:
     def __init__(self, color, num_pieces, spaces):
         self.color = color
@@ -323,7 +336,7 @@ class Piece:
             s += '\u25cb'
         if self.color == 'black':
             s += '\u25cf'
-        return s + str(self.id)
+        return s #+ str(self.id)
 
 class Die:
     def __init__(self, dice):
@@ -340,7 +353,9 @@ class Die:
         return str(self.prev)
 
 if __name__ == '__main__':
-    print(ANSI.blinking + "Congratulations!!!\U0001f389" + ANSI.cursor_up(1))
+    print(ANSI.erase_entire_screen)
     game = Game()
     while game.play():
         continue
+    print(ANSI.normal)
+    print(ANSI.erase_entire_screen)
