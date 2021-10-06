@@ -64,13 +64,13 @@ class Game:
             continue
 
     def multiplayer(self):
-        user_input = Reader.parse(input("Play as 'host' or 'guest'?"))
+        user_input = Reader.parse(input("Play as 'host' or 'guest'? "))
         if user_input == "host":
             self.host()
         if user_input == "guest":
-            ip = input("What IP Address would you like to connect to?")
+            ip = input("What IP Address would you like to connect to? ")
             self.guest(ip)
-    def host(self, port=80):
+    def host(self, port=1025):
         with ThreadedTCPServer(('', port), PlayerHandler) as server:
             print(f'The Royal Game of Ur server is running.')
             server.serve_forever()
@@ -401,7 +401,7 @@ class Die:
 
 # https://cs.lmu.edu/~ray/notes/pythonnetexamples/
 class ThreadedClient:
-    def __init__(self, host, port=80):
+    def __init__(self, host, port=1025):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
     def listen(self):
