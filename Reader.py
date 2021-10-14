@@ -12,9 +12,12 @@ class Token(NamedTuple):
 def tokenize(user_input):
     keywords = {
         'roll',
+        'ai'
         'quit',
+        'exit',
         'multiplayer',
         'host',
+        'hostplayer',
         'guest',
         'skip',
         'board',

@@ -5,6 +5,9 @@ import threading
 import sys
 from ANSI import ANSI
 
+import subprocess
+import shutil
+
 import os
 import socketserver as ss
 import socket
@@ -16,21 +19,22 @@ encoding = 'utf-8'
 
 currout = sys.stdout
 oldprint = print
+fill_style_to_end = "\x1b[K"
 def print(value):
     if sys.stdout == currout:
-        oldprint(value)
+        oldprint(value, end='\n' + fill_style_to_end)
     else:
-        sys.stdout.write(str(value) + "\n")
+        sys.stdout.write(str(value) + "\n" + fill_style_to_end)
 
 currin = sys.stdin
 oldinput = input
 def input(prompt=""):
     if sys.stdin == currin:
-        return oldinput(prompt)
+        return oldinput(prompt + fill_style_to_end)
     else:
         if prompt:
-            print(prompt)
-        return str(sys.stdin.readline())
+            print(prompt + fill_style_to_end)
+        return str(sys.stdin.readline()) + fill_style_to_end
 
 class Game:
     print(style)
@@ -39,11 +43,11 @@ class Game:
     instructions = "Select piece by column (i.e. 0-13), or -1 to select a piece from the starting line."
     def __init__(self, safe_a=4, rosette_a=4, safe_b=2, rosette_b=2, combat_a=8, rosette_c=4, num_pieces=7, dice=4):
         self.board = Board(safe_a, rosette_a, safe_b, rosette_b, combat_a, rosette_c, num_pieces, dice)
-        self.help = "Ur is a race between two sides. Get all your pieces from the left to the right, landing exactly on space " + str(self.board.total_spaces) + ".\rBut watch out! Spaces " + str(self.board.safe_a) + " to " + str(self.board.safe_a + self.board.combat_a - 1) + " are combat spaces.\rIf your opponent lands on your piece, and it isn't on a rosette (*), it'll have to return to the beginning.\rNot only are rosettes safe to land on, they also mean you get another roll when you land on them.\rNote: You can only skip a turn if there are absolutely no moves available. Otherwise, you must make a move, even if it's disadvantageous to you."
+        self.help = "Ur is a race between two sides. Get all your pieces from the left to the right, landing exactly on space " + str(self.board.total_spaces) + fill_style_to_end + ".\nBut watch out! Spaces " + str(self.board.safe_a) + " to " + str(self.board.safe_a + self.board.combat_a - 1) + " are combat spaces." + fill_style_to_end + "\nIf your opponent lands on your piece, and it isn't on a rosette (*), it'll have to return to the beginning." + fill_style_to_end + "\nNot only are rosettes safe to land on, they also mean you get another roll when you land on them." + fill_style_to_end + "\nNote: You can only skip a turn if there are absolutely no moves available. Otherwise, you must make a move, even if it's disadvantageous to you." + fill_style_to_end
 
         self.active = False
     def play(self):
-        prompt = self.instructions + "\r" + self.board.player.capitalize() + ": "
+        prompt = self.instructions + "\n" + self.board.player.capitalize() + ": "
 
         print(self.intro)
         while not self.active:
@@ -74,20 +78,29 @@ class Game:
             self.guest(ip)
     def host(self, port=1025):
         with ThreadedTCPServer(('', port), PlayerHandler) as server:
-            print(f'The Royal Game of Ur server is running.')
+            print('The Royal Game of Ur server is running.')
             server.serve_forever()
             # server_thread = threading.Thread(target=server.serve_forever)
             # server_thread.daemon = True
             # server_thread.start()
             # self.guest("localhost")
-    def host_player(self, port=1025):
-        with ThreadedTCPServer(('', port), PlayerHandler) as server:
-            print(f'The Royal Game of Ur server is running.')
-            # server.serve_forever()
-            server_thread = threading.Thread(target=server.serve_forever)
-            server_thread.daemon = True
-            server_thread.start()
+    def host_player(self):
+        # server.serve_forever()
+        # server_thread = threading.Thread(target=server.serve_forever)
+        # server_thread.daemon = True
+        # server_thread.start()
+        if getattr(sys, 'frozen', False):
+            serve = [sys.executable, "serve"]
+        else:
+            serve = [sys.executable, os.path.basename(__file__), "serve"]
+        print("Executing '" + " ".join(serve) + "' as daemon.")
+        try:
+            proc = subprocess.Popen(serve)
+            print('The Royal Game of Ur server is running.')
             self.guest("localhost")
+        except Exception as e:
+            proc.kill()
+            print(e)
     def guest(self, ip):
         try:
             client = ThreadedClient(ip)
@@ -101,8 +114,8 @@ class Game:
             coloration = ANSI.background_white + ANSI.foreground_black
         else:
             coloration = ANSI.background_black + ANSI.foreground_white
-        self.prompt = self.instructions + "\r" + coloration +  self.board.player.capitalize() + ": " + style
-        self.won = ANSI.blinking + self.board.player.capitalize() + " has won!\rCongratulations!!!\U0001f389" + style
+        self.prompt = self.instructions + "\n" + coloration +  self.board.player.capitalize() + ": " + style
+        self.won = ANSI.blinking + self.board.player.capitalize() + " has won!\nCongratulations!!!\U0001f389" + style
         print(self.board)
         dist = self.board.die.roll()
         rolled = ANSI.foreground_red + "You've rolled a " + str(dist) + "!" + style
@@ -485,7 +498,18 @@ class Tee:
 if __name__ == '__main__':
     print(ANSI.erase_entire_screen)
     game = Game()
-    while game.play():
-        continue
-    print(ANSI.normal)
-    print(ANSI.erase_entire_screen)
+    try:
+        if len(sys.argv) > 1:
+            if sys.argv[1].lower() == "multiplayer":
+                game.guest(sys.argv[2])
+            if sys.argv[1].lower() == "serve":
+                game.host()
+        while game.play():
+            continue
+    except Exception as e:
+        print(ANSI.normal)
+        print(ANSI.erase_entire_screen)
+        print(e)
+    else:
+        print(ANSI.normal)
+        print(ANSI.erase_entire_screen)
