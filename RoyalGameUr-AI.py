@@ -354,7 +354,7 @@ class Board:
         actives = []
         for column in range(self.total_spaces):
             piece = self.select_piece(column)
-            if piece:
+            if piece and (piece.color == self.player):
                 actives.append(piece)
 
         if len(actives) == 0 and self.starting_line[self.player].out_of_play > 0:
@@ -398,7 +398,7 @@ class Board:
         actives = []
         for column in range(self.total_spaces):
             piece = self.select_piece(column)
-            if piece:
+            if piece and (piece.color == self.player):
                 actives.append(piece)
 
         if len(actives) == 0 and self.starting_line[self.player].out_of_play > 0:
