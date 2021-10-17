@@ -38,9 +38,9 @@ def input(prompt=""):
 
 class Game:
     print(style)
-    intro = 'Welcome to the Royal Game of Ur!\nEnter "play" to begin, or "help" to learn how to play the game.\nEnter "multiplayer" to play online, or "ai" to play against an artificial intelligence.'
+    intro = 'Welcome to the Royal Game of Ur!\nEnter "play" to begin, or "help" to learn how to play the game.\nEnter "multiplayer" to play online.\nEnter "ai" to play against an artificial intelligence.'
     prompt = "Ur: "
-    instructions = "Select piece by column (i.e. 0-13), or -1 to select a piece from the starting line."
+    instructions = "Select piece by column (i.e. 0-13), or\nEnter '-1' to select a piece from the starting line."
     def __init__(self, safe_a=4, rosette_a=4, safe_b=2, rosette_b=2, combat_a=8, rosette_c=4, num_pieces=7, dice=4):
         self.board = Board(safe_a, rosette_a, safe_b, rosette_b, combat_a, rosette_c, num_pieces, dice)
         self.help = "Ur is a race between two sides. Get all your pieces from the left to the right, landing exactly on space " + str(self.board.total_spaces) + fill_style_to_end + ".\nBut watch out! Spaces " + str(self.board.safe_a) + " to " + str(self.board.safe_a + self.board.combat_a - 1) + " are combat spaces." + fill_style_to_end + "\nIf your opponent lands on your piece, and it isn't on a rosette (*), it'll have to return to the beginning." + fill_style_to_end + "\nNot only are rosettes safe to land on, they also mean you get another roll when you land on them." + fill_style_to_end + "\nNote: You can only skip a turn if there are absolutely no moves available. Otherwise, you must make a move, even if it's disadvantageous to you." + fill_style_to_end
@@ -114,9 +114,9 @@ class Game:
         playing = True
         while playing:
             if self.board.player == "white":
-                self.play_turn()
+                playing = self.play_turn()
             else:
-                self.play_ai()
+                playing = self.play_ai()
     def play_ai(self):
         """ Thanks for your contribution, Hirudan:
             "My algorithm would be kinda like this:
@@ -158,9 +158,16 @@ class Game:
                 if user_input == 'skip':
                     if self.board.should_skip():
                         self.board.switch_sides()
+                        print("Skipped!")
                         return True
-                if user_input == 'quit' or user_input == 'exit':
-                    return False
+                    else:
+                        print("You can only skip a turn if there are absolutely no moves available.\nOtherwise, you must make a move, even if it's disadvantageous to you.")
+                # if user_input == 'quit' or user_input == 'exit':
+                #     return False
+                if user_input == "quit" or user_input == "exit":
+                    q = input(ANSI.foreground_red + "Are you sure you would like to quit? y/n: " + style)
+                    if q == "y":
+                        return False
             column = user_input
             piece = self.board.select_piece(column)
             success, reroll = self.board.move_by(piece, dist)
@@ -172,7 +179,7 @@ class Game:
         print(ANSI.erase_entire_screen)
         return True
     def get_ai_input(self):
-        line = Reader.parse(input(self.prompt))
+        line = Reader.parse(self.board.ai_input())
         if type(line) is not tuple:
             return True, line
         if type(line[1]) is int:
@@ -207,9 +214,16 @@ class Game:
                 if user_input == 'skip':
                     if self.board.should_skip():
                         self.board.switch_sides()
+                        print("Skipped!")
                         return True
-                if user_input == 'quit' or user_input == 'exit':
-                    return False
+                    else:
+                        print("You can only skip a turn if there are absolutely no moves available.\nOtherwise, you must make a move, even if it's disadvantageous to you.")
+                # if user_input == 'quit' or user_input == 'exit':
+                #     return False
+                if user_input == "quit" or user_input == "exit":
+                    q = input(ANSI.foreground_red + "Are you sure you would like to quit? y/n: " + style)
+                    if q == "y":
+                        return False
             column = user_input
             piece = self.board.select_piece(column)
             success, reroll = self.board.move_by(piece, dist)
@@ -289,19 +303,28 @@ class Board:
             return False
         dest_id = piece.location.id + number
         dest = self.select_space(dest_id)
-        if dest: # valid destination
-            if dest.is_occupied():
-                if dest.contents.color != piece.color:
-                    if not dest.rosette:
-                        return True
-                    else:
-                        return False
-                else:
-                    return False
-            else:
-                return True
-        else:
+        # if dest: # valid destination
+        #     if dest.is_occupied():
+        #         if dest.contents.color != piece.color:
+        #             if not dest.rosette:
+        #                 return True
+        #             else:
+        #                 return False
+        #         else:
+        #             return False
+        #     else:
+        #         return True
+        # else:
+        #     return False
+        if not dest: # invalid destination
             return False
+        if not dest.is_occupied(): # open destination
+            return True
+        if dest.contents.color == piece.color: # can't take own piece
+            return False
+        return not dest.rosette # destination is occupied by opponent
+
+
     def safe(self):
         return self.invalid()
     def invalid(self):
@@ -351,18 +374,10 @@ class Board:
 
     def should_skip(self):
         # returns True if no valid moves are available, False otherwise.
-        actives = []
-        for column in range(self.total_spaces):
+        dist = self.die.prev
+        for column in range(-1, self.total_spaces):
             piece = self.select_piece(column)
-            if piece and (piece.color == self.player):
-                actives.append(piece)
-
-        if len(actives) == 0 and self.starting_line[self.player].out_of_play > 0:
-            return False
-
-        number = self.die.prev
-        for piece in actives:
-            if self.can_move_by(piece, number):
+            if piece and (piece.color == self.player) and self.can_move_by(piece, dist):
                 return False
         return True
 
@@ -396,36 +411,49 @@ class Board:
     def ai_input(self):
         # returns True if no valid moves are available, False otherwise.
         actives = []
-        for column in range(self.total_spaces):
+        dist = self.die.prev
+        for column in range(self.total_spaces - 1, -2, -1):
             piece = self.select_piece(column)
-            if piece and (piece.color == self.player):
+            if piece and (piece.color == self.player) and self.can_move_by(piece, dist):
                 actives.append(piece)
+                print(piece.location.id)
 
-        if len(actives) == 0 and self.starting_line[self.player].out_of_play > 0:
-            return False
-
-        number = self.die.prev
+        if not actives:
+            return "skip"
         for piece in actives:
-            if self.can_move_by(piece, number):
-                return False
-        return True
+            if self.can_score(piece, dist):
+                return str(piece.location.id)
+        for piece in actives:
+            if self.can_take(piece, dist):
+                return str(piece.location.id)
+        for piece in actives:
+            if self.can_rosette(piece, dist):
+                return str(piece.location.id)
+        for piece in actives:
+            if self.can_start_a_piece(piece, dist):
+                return str(piece.location.id)
+        # for piece in actives:
+        #     if self.can_move_by(piece, dist):
+        #         return str(piece.location.id)
+        # return "skip"
+        return str(actives[0].location.id)
 
-    def can_score(self):
-        pass
-    def can_take(self):
-        pass
-    def can_rosette(self):
-        pass
-    def can_start_a_piece(self):
-        pass
-    def if_can_score(self):
-        pass
-    def if_can_take(self):
-        pass
-    def if_can_rosette(self):
-        pass
-    def if_can_start_a_piece(self):
-        pass
+    def can_score(self, piece, dist):
+        dest_id = piece.location.id + dist
+        return dest_id == self.total_spaces
+
+    def can_take(self, piece, dist):
+        dest_id = piece.location.id + dist
+        destination = self.select_space(dest_id)
+        return destination.is_occupied() and (destination.contents.color != piece.color) and not destination.rosette
+
+    def can_rosette(self, piece, dist):
+        dest_id = piece.location.id + dist
+        destination = self.select_space(dest_id)
+        return not destination.is_occupied() and destination.rosette
+
+    def can_start_a_piece(self, piece, dist):
+        return piece.location.id == -1
 
 class FinishLine:
     def __init__(self, color, num_pieces, spaces):
@@ -446,23 +474,25 @@ class FinishLine:
 
 class StartingLine:
     def __init__(self, color, pieces):
-        num_pieces = len(pieces)
         self.color = color
         self._contents = [Space(self.color, -1, False, piece) for piece in pieces]
-        self.out_of_play = num_pieces
+        self.out_of_play = len(pieces)
     @property
     def contents(self):
         return self._contents
     @contents.getter
     def contents(self):
         if self.out_of_play < 0:
+            print("out of play:" + str(self.out_of_play))
             return None
         self.out_of_play -= 1
+        print("out of play:" + str(self.out_of_play))
         return self._contents[self.out_of_play].contents
     @contents.setter
     def contents(self, piece):
         self._contents[self.out_of_play].contents = piece
         self.out_of_play += 1
+        print("out of play:" + str(self.out_of_play))
 
 class Space:
     def __init__(self, color, id, rosette, contents=None):
