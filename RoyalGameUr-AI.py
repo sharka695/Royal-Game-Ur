@@ -274,30 +274,60 @@ class Board:
         self.player = 'white'
         self.won = False
 
-    def move(self, piece, space):
-        piece.location = space
-        if space.rosette:
+    def move(self, piece, dest_id):
+        # # origin = piece.location
+        # self.select_space(piece.location.id, piece.color).contents = None
+        # # destination.contents = piece
+        # self.select_space(destination.id, piece.color).contents = piece
+        # piece.location = destination
+        # # origin.contents = None
+        self.select_space(piece.location.id, piece.color).contents = None
+        self.select_space(dest_id, piece.color).contents = piece
+        piece.location = self.select_space(dest_id, piece.color)
+        if self.select_space(dest_id, piece.color).rosette:
             return True, True
         return True, False
+        # if destination.rosette:
+        #     return True, True
+        # return True, False
+    # def move_by(self, piece, number):
+    #     if piece == None or piece.color != self.player:
+    #         return False, False
+    #     dest_id = piece.location.id + number
+    #     dest = self.select_space(dest_id)
+    #     if dest: # valid destination
+    #         if dest.is_occupied():
+    #             if dest.contents.color != piece.color:
+    #                 if not dest.rosette:
+    #                     self.remove(dest)
+    #                     return self.move(piece, dest)
+    #                 else:
+    #                     return self.safe()
+    #             else:
+    #                 return self.invalid()
+    #         else:
+    #             return self.move(piece, dest)
+    #     else:
+    #         return False, False
+
     def move_by(self, piece, number):
         if piece == None or piece.color != self.player:
             return False, False
         dest_id = piece.location.id + number
         dest = self.select_space(dest_id)
-        if dest: # valid destination
-            if dest.is_occupied():
-                if dest.contents.color != piece.color:
-                    if not dest.rosette:
-                        self.remove(dest)
-                        return self.move(piece, dest)
-                    else:
-                        return self.safe()
-                else:
-                    return self.invalid()
-            else:
-                return self.move(piece, dest)
-        else:
+        if not dest: # invalid destination
             return False, False
+        if not dest.is_occupied(): # open destination
+            # return self.move(piece, dest)
+            return self.move(piece, dest_id)
+        if dest.contents.color == piece.color: # can't take own piece
+            return self.invalid()
+        if dest.rosette: # destination is occupied by opponent
+            return self.safe()
+        self.remove(dest)
+        # return self.move(piece, dest)
+        return self.move(piece, dest_id)
+
     def can_move_by(self, piece, number):
         if piece == None or piece.color != self.player:
             return False
@@ -335,6 +365,7 @@ class Board:
         selected = None
         if column < 0:
             selected = self.starting_line[player]
+            # selected = self.starting_line[player].pseudo_space
         elif self.safe_a <= column < self.total_spaces - self.safe_b:
             selected = self.contents['combat'][column]
         elif 0 <= column < self.total_spaces:
@@ -353,7 +384,9 @@ class Board:
     def remove(self, place):
         piece = place.contents
         side = piece.color
-        self.starting_line[side].contents = piece
+        # self.starting_line[side].contents = piece
+        self.starting_line[side].pseudo_space = piece
+        place.contents = None
     def make_move(self, column, dist=None):
         if dist == None:
             dist = self.die.prev
@@ -383,6 +416,8 @@ class Board:
 
     def __repr__(self):
         s = ANSI.background_white + ANSI.foreground_black#''
+        for color, line in self.starting_line.items():
+            s += str(line) + '\n'
         for color, spaces in self.contents.items():
             s += color.capitalize().center(6) + ":"
             for space in spaces:
@@ -394,6 +429,9 @@ class Board:
         s += "".center(7)
         for n in range(self.total_spaces):
             s += str(n).center(4)
+        s += '\n'
+        for color, line in self.finish_line.items():
+            s+= str(line) + '\n'
         return s + style
 
 ##############################################################################
@@ -471,51 +509,96 @@ class FinishLine:
         space = self._contents[index]
         self.finished += 1
         return space
+    def __repr__(self):
+        s = "<"
+        for space in self._contents:
+            s += str(space).center(2)
+        return s + ">"
+
+# class StartingLine:
+#     def __init__(self, color, pieces):
+#         self.color = color
+#         self._contents = [Space(self.color, -1, False, piece) for piece in pieces]
+#         self.out_of_play = len(pieces)
+#     @property
+#     def contents(self):
+#         return self._contents
+#     @contents.getter
+#     def contents(self):
+#         if self.out_of_play < 0:
+#             print("out of play:" + str(self.out_of_play))
+#             return None
+#         self.out_of_play -= 1
+#         print("out of play:" + str(self.out_of_play))
+#         return self._contents[self.out_of_play].contents
+#     @contents.setter
+#     def contents(self, piece):
+#         self._contents[self.out_of_play].contents = piece
+#         self.out_of_play += 1
+#         print("out of play:" + str(self.out_of_play))
+
+# class StartingLine:
+#     def __init__(self, color, pieces):
+#         self.color = color
+#         self._contents = [Space(self.color, -1, False, piece) for piece in pieces]
+#         self.out_of_play = len(pieces) - 1
+#     @property
+#     def contents(self):
+#         return self._contents
+#     @contents.getter
+#     def contents(self):
+#         if self.out_of_play < 0:
+#             return None
+#         # self.out_of_play -= 1
+#         print(self.color + " out of play: " + str(self.out_of_play))
+#         return self._contents[self.out_of_play].contents
+#     @contents.setter
+#     def contents(self, piece):
+#         if piece.location.id < 0:
+#             self.out_of_play -= 1
+#         else:
+#             self.out_of_play += 1
+#         print(self.color + " out of play: " + str(self.out_of_play))
+#         self._contents[self.out_of_play].contents = piece
 
 class StartingLine:
     def __init__(self, color, pieces):
         self.color = color
-        self._contents = [Space(self.color, -1, False, piece) for piece in pieces]
+        self._pseudo_space = [Space(self.color, -1, False, piece) for piece in pieces]
         self.out_of_play = len(pieces)
     @property
+    def pseudo_space(self):
+        return self._pseudo_space[self.out_of_play - 1]
+    @property
     def contents(self):
-        return self._contents
+        return self.pseudo_space.contents
     @contents.getter
     def contents(self):
-        if self.out_of_play < 0:
-            print("out of play:" + str(self.out_of_play))
-            return None
-        self.out_of_play -= 1
-        print("out of play:" + str(self.out_of_play))
-        return self._contents[self.out_of_play].contents
+        return self.pseudo_space.contents
     @contents.setter
     def contents(self, piece):
-        self._contents[self.out_of_play].contents = piece
-        self.out_of_play += 1
-        print("out of play:" + str(self.out_of_play))
+        if piece:
+            self.out_of_play += 1
+        self.pseudo_space.contents = piece
+        if not piece:
+            self.out_of_play -= 1
+    @contents.deleter
+    def contents(self):
+        del self.pseudo_space.contents
+        self.out_of_play -= 1
+    def __repr__(self):
+        s = "["
+        for space in self._pseudo_space:
+            s += str(space).center(2)
+        return s + "]" + " pieces out of play: " + str(self.out_of_play)
 
 class Space:
     def __init__(self, color, id, rosette, contents=None):
         self.color = color
         self.id = id
         self.rosette = rosette
-        self._contents = contents
-    @property
-    def contents(self):
-        return self._contents
-    @contents.getter
-    def contents(self):
-        return self._contents
-    @contents.setter
-    def contents(self, piece):
-        if piece:
-            piece.location = self
-        else:
-            self._contents = None
-    @contents.deleter
-    def contents(self):
-        if self._contents:
-            del self._contents.location
+        self.contents = contents
+
     def is_occupied(self):
         return self.contents != None
     def __repr__(self):
@@ -528,30 +611,15 @@ class Piece:
     def __init__(self, color, id):
         self.color = color
         self.id = id
-        self._location = Space(color, -1, False)
-    @property
-    def location(self):
-        return self._location
-    @location.getter
-    def location(self):
-        return self._location
-    @location.setter
-    def location(self, space):
-        origin = self._location
-        space._contents = self
-        self._location = space
-        origin.contents = None
-    @location.deleter
-    def location(self):
-        self._location._contents = None
-        self._location = None
+        self.location = Space(color, -1, False)
+
     def __repr__(self):
         s = ''
         if self.color == 'white':
             s += '\u25cb'
         if self.color == 'black':
             s += '\u25cf'
-        return s #+ str(self.id)
+        return (s + " " + str(self.id)) #.center(4)
 
 class Die:
     def __init__(self, dice):
@@ -654,7 +722,7 @@ if __name__ == '__main__':
     except Exception as e:
         print(ANSI.normal)
         print(ANSI.erase_entire_screen)
-        print(e)
+        raise
     else:
         print(ANSI.normal)
         print(ANSI.erase_entire_screen)
