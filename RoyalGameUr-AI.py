@@ -62,12 +62,18 @@ class Game:
                     self.multiplayer()
                 elif user_input == "ai":
                     self.ai()
+                    self.reset()
                 elif user_input == "quit" or user_input == "exit":
                     q = input(ANSI.foreground_red + "Are you sure you would like to quit? y/n: " + style)
                     if q == "y":
                         return
         while self.play_turn():
             continue
+        self.active = False
+        self.reset()
+        self.play()
+    def reset(self):
+        self.board = Board()
 
     def multiplayer(self):
         user_input = Reader.parse(input("Play as 'host' or 'guest' (or 'hostplayer' [experimental])? "))
@@ -248,6 +254,7 @@ class Board:
         self.total_spaces = safe_a + combat_a + safe_b
         self.num_pieces = num_pieces
 
+        self.dice = dice
         self.die = Die(dice)
 
         self.starting_line = {'white': StartingLine('white', [Piece('white', id) for id in range(self.num_pieces)]), 'black': StartingLine('black', [Piece('black', id) for id in range(self.num_pieces)])}
@@ -371,7 +378,7 @@ class Board:
         elif 0 <= column < self.total_spaces:
             selected = self.contents[player][column]
         elif column == self.total_spaces:
-            selected = self.finish_line[player].contents
+            selected = self.finish_line[player]#.contents
         return selected
     def select_piece(self, column, player=None):
         if not player:
@@ -381,12 +388,15 @@ class Board:
         if space:
             selected = space.contents
         return selected
+    # def remove(self, place):
+    #     piece = place.contents
+    #     side = piece.color
+    #     self.starting_line[side].contents = piece
+    #     # self.starting_line[side].pseudo_space = piece
+    #     place.contents = None
     def remove(self, place):
         piece = place.contents
-        side = piece.color
-        # self.starting_line[side].contents = piece
-        self.starting_line[side].pseudo_space = piece
-        place.contents = None
+        self.move(piece, -1)
     def make_move(self, column, dist=None):
         if dist == None:
             dist = self.die.prev
@@ -394,12 +404,20 @@ class Board:
         if not piece:
             return False
         return self.move_by(piece, dist)
+    # def switch_sides(self):
+    #     if self.player == 'white':
+    #         self.player = 'black'
+    #     else:
+    #         self.player = 'white'
+    #     return self.player
     def switch_sides(self):
-        if self.player == 'white':
-            self.player = 'black'
-        else:
-            self.player = 'white'
+        self.player = self.get_opponent(self.player)
         return self.player
+    def get_opponent(self, side):
+        if side == 'white':
+            return 'black'
+        else:
+            return 'white'
     def has_won(self):
         if self.finish_line[self.player].finished == self.num_pieces:
             self.won = True
@@ -447,7 +465,6 @@ class Board:
 #   -- whichever one is furthest along"
 ##############################################################################
     def ai_input(self):
-        # returns True if no valid moves are available, False otherwise.
         actives = []
         dist = self.die.prev
         for column in range(self.total_spaces - 1, -2, -1):
@@ -493,25 +510,63 @@ class Board:
     def can_start_a_piece(self, piece, dist):
         return piece.location.id == -1
 
+    def can_get_hit(self, piece, dist):
+        dest_id = piece.location.id + dist
+        destination = self.select_space(dest_id)
+        opponent = get_opponent(piece.color)
+        for dist in range(1, self.dice + 1):
+            space_in_attacking_range = self.select_space(dest_id - dist, opponent)
+            if space_in_attacking_range.is_occupied():
+                return True
+        return False
+
 class FinishLine:
+    # def __init__(self, color, num_pieces, spaces):
+    #     self.color = color
+    #     self._contents = [Space(self.color, spaces, False) for _ in range(num_pieces)]
+    #     self.finished = 0
+    # @property
+    # def contents(self):
+    #     return self._contents
+    # @contents.getter
+    # def contents(self):
+    #     index = self.finished
+    #     if index >= len(self._contents):
+    #         return None
+    #     space = self._contents[index]
+    #     self.finished += 1
+    #     return space
     def __init__(self, color, num_pieces, spaces):
         self.color = color
-        self._contents = [Space(self.color, spaces, False) for _ in range(num_pieces)]
+        self._pseudo_space = [Space(self.color, spaces, False) for _ in range(num_pieces)]
         self.finished = 0
+        self.id = -1
+        self.rosette = False
+    def is_occupied(self):
+        return False
+    @property
+    def pseudo_space(self):
+        return self._pseudo_space[self.finished - 1]
     @property
     def contents(self):
-        return self._contents
+        return self.pseudo_space.contents
     @contents.getter
     def contents(self):
-        index = self.finished
-        if index >= len(self._contents):
-            return None
-        space = self._contents[index]
-        self.finished += 1
-        return space
+        return self.pseudo_space.contents
+    @contents.setter
+    def contents(self, piece):
+        if piece:
+            self.finished += 1
+        self.pseudo_space.contents = piece
+        if not piece:
+            self.finished -= 1
+    @contents.deleter
+    def contents(self):
+        del self.pseudo_space.contents
+        self.finished -= 1
     def __repr__(self):
         s = "<"
-        for space in self._contents:
+        for space in self._pseudo_space:
             s += str(space).center(2)
         return s + ">"
 
@@ -566,6 +621,10 @@ class StartingLine:
         self.color = color
         self._pseudo_space = [Space(self.color, -1, False, piece) for piece in pieces]
         self.out_of_play = len(pieces)
+        self.id = -1
+        self.rosette = False
+    def is_occupied(self):
+        return False
     @property
     def pseudo_space(self):
         return self._pseudo_space[self.out_of_play - 1]
