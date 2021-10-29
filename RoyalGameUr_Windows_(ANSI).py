@@ -788,6 +788,7 @@ class PlayerHandler(ss.StreamRequestHandler):
             self.game.player2 = self
             self.game.wait = False
             coloration = ANSI.background_white + ANSI.foreground_black
+        self.send("Source code available at https://github.com/sharka695/Royal-Game-Ur")
         self.send("Welcome, " + ANSI.blinking + coloration + self.color + style)
     def process_clients(self):
         sys.stdout = Tee(self.wfile, self.opponent.wfile)
