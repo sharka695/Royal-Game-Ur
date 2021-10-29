@@ -1,3 +1,5 @@
+# Copyright 2021 sharka695
+
 from random import randint
 import dataclasses
 import Reader
@@ -13,7 +15,10 @@ import socketserver as ss
 import socket
 import io
 
-style = ANSI.background_white + ANSI.foreground_black
+from contextlib import closing
+from time import sleep
+
+style = ANSI.background_white + ANSI.foreground_black + ANSI.not_blinking
 
 encoding = 'utf-8'
 
@@ -34,7 +39,7 @@ def input(prompt=""):
     else:
         if prompt:
             print(prompt + fill_style_to_end)
-        return str(sys.stdin.readline()) + fill_style_to_end
+        return str(sys.stdin.readline().decode(encoding)) # + fill_style_to_end
 
 class Game:
     print(style)
@@ -93,6 +98,15 @@ class Game:
             # server_thread.start()
             # self.guest("localhost")
     def host_player(self):
+        # def check_socket(host='', port=1025):
+        #     # https://stackoverflow.com/a/45217844
+        #     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+        #         return sock.connect_ex((host, port)) == 0
+        # def wait_for_socket(host='', port=1025, retries=10, wait=10):
+        #     while not check_socket(host, port) and retries > 0:
+        #         sleep(wait)
+        #         retries -= 1
+        #     return retries <= 0
         # server.serve_forever()
         # server_thread = threading.Thread(target=server.serve_forever)
         # server_thread.daemon = True
@@ -104,16 +118,21 @@ class Game:
         print("Executing '" + " ".join(serve) + "' as daemon.")
         try:
             proc = subprocess.Popen(serve)
+            print('Giving the server time to start. Please be patient.')
+            # if wait_for_socket():
+            #     raise Exception("Apparently, The Royal Game of Ur server actually isn't running. Please try again.")
+            sleep(10)
             print('The Royal Game of Ur server is running.')
             self.guest("localhost")
         except Exception as e:
             proc.kill()
-            print(e)
+            raise
     def guest(self, ip):
+        print(ANSI.erase_entire_screen)
         try:
             client = ThreadedClient(ip)
         except Exception as e:
-            print(e)
+            raise
         else:
             client.main()
     def ai(self):
@@ -433,7 +452,7 @@ class Board:
         return True
 
     def __repr__(self):
-        s = ANSI.background_white + ANSI.foreground_black#''
+        s = '' #ANSI.background_white + ANSI.foreground_black#''
         for color, line in self.starting_line.items():
             s += str(line) + '\n'
         for color, spaces in self.contents.items():
@@ -649,7 +668,7 @@ class StartingLine:
         s = "["
         for space in self._pseudo_space:
             s += str(space).center(2)
-        return s + "]" + " pieces out of play: " + str(self.out_of_play)
+        return s + "]" # + " pieces out of play: " + str(self.out_of_play)
 
 class Space:
     def __init__(self, color, id, rosette, contents=None):
@@ -741,6 +760,7 @@ class PlayerHandler(ss.StreamRequestHandler):
             self.opponent = None
             self.game.player1 = self
             self.game.wait = True
+            coloration = ANSI.background_black + ANSI.foreground_white
         else:
             self.game = PlayerHandler.unpaired_game
             PlayerHandler.unpaired_game = None
@@ -749,7 +769,8 @@ class PlayerHandler(ss.StreamRequestHandler):
             self.opponent.opponent = self
             self.game.player2 = self
             self.game.wait = False
-        self.send("Welcome, " + self.color)
+            coloration = ANSI.background_white + ANSI.foreground_black
+        self.send("Welcome, " + ANSI.blinking + coloration + self.color + style)
     def process_clients(self):
         sys.stdout = Tee(self.wfile, self.opponent.wfile)
         self.game.continue_playing = True
@@ -757,15 +778,17 @@ class PlayerHandler(ss.StreamRequestHandler):
             if self.game.board.player == self.color:
                 sys.stdin = self.rfile
                 self.game.continue_playing = self.game.play_turn()
+                # self.opponent.send(str(self.game.board))
+
 class Tee:
-    def __init__(self, *ioputs):
-        self.ioputs = ioputs
+    def __init__(self, *inputs):
+        self.inputs = inputs
     def write(self, s):
-        for ioput in self.ioputs:
-            if isinstance(ioput, ss._SocketWriter):
-                ioput.write(s.encode(encoding))
+        for input in self.inputs:
+            if isinstance(input, ss._SocketWriter):
+                input.write(s.encode(encoding))
             else:
-                ioput.write(s)
+                input.write(s)
 
 if __name__ == '__main__':
     print(ANSI.erase_entire_screen)
