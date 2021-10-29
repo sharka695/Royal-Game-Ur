@@ -61,7 +61,7 @@ def input(prompt=""):
 
 class Game:
     print(style)
-    intro = 'Welcome to the Royal Game of Ur!\nEnter "play" to begin, or "help" to learn how to play the game.\nEnter "multiplayer" to play online.\nEnter "ai" to play against an artificial intelligence.'
+    intro = 'Copyright 2021 sharka695\n\nWelcome to the Royal Game of Ur!\nEnter "play" to begin, or "help" to learn how to play the game.\nEnter "multiplayer" to play online.\nEnter "ai" to play against an artificial intelligence.'
     prompt = "Ur: "
     instructions = "Select piece by column (i.e. 0-13), or\nEnter '-1' to select a piece from the starting line."
     def __init__(self, safe_a=4, rosette_a=4, safe_b=2, rosette_b=2, combat_a=8, rosette_c=4, num_pieces=7, dice=4):
@@ -149,8 +149,9 @@ class Game:
         print(ANSI.erase_entire_screen)
         try:
             client = ThreadedClient(ip)
-        except Exception as e:
-            raise
+        except ConnectionRefusedError as e:
+            print(e)
+            return
         else:
             client.main()
     def ai(self):
